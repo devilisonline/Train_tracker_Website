@@ -38,86 +38,61 @@ app.get('/spot-result', async (req, res) => {
     if (!trainNo) return res.send(wrapHTML('Error', '<div class="error">Missing Train No</div>'));
 
     try {
-        const response = await axios.get(`https://rappid.in/apis/train.php?train_no=${trainNo}&start_date=${day}&day=${day}`, {
+        const url = `https://trainstatus.info/running-status/${trainNo}-${day}`;
+        const response = await axios.get(url, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
             timeout: 5000
         });
         
-        if (response.data && response.data.success) {
-            const data = response.data;
-            let currentStnIdx = data.data.findIndex(s => s.is_current_station);
-            
-            // Build the top banner with exact status
-            let content = `<div class="card" style="border-left: 4px solid #0b3e71;">
-                <div class="card-title">Live Status</div>
-                <div class="card-text success" style="font-weight:bold; font-size: 15px;">${data.message || 'Running'}</div>`;
-            
-            if (currentStnIdx !== -1) {
-                const current = data.data[currentStnIdx];
-                const prev = currentStnIdx > 0 ? data.data[currentStnIdx - 1] : null;
-                const next = currentStnIdx < data.data.length - 1 ? data.data[currentStnIdx + 1] : null;
-                
-                content += `<div style="margin-top: 10px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
-                if (current.delay && current.delay !== '0min') {
-                    content += `<div class="card-text error" style="padding:0; text-align:left; font-size:14px;">Delay: ${current.delay}</div>`;
-                }
-                
-                if (data.message.toLowerCase().includes('departed') || data.message.toLowerCase().includes('crossed')) {
-                    if (current) content += `<div class="card-text" style="color: #666;"><strong>Last Station:</strong> ${current.station_name}</div>`;
-                    if (next) content += `<div class="card-text" style="color: #0b3e71; font-weight:bold;"><strong>Heading to:</strong> ${next.station_name}</div>`;
-                } else {
-                    if (current) content += `<div class="card-text" style="color: #0b3e71; font-weight:bold;"><strong>Currently At:</strong> ${current.station_name}</div>`;
-                    if (next) content += `<div class="card-text" style="color: #666;"><strong>Next Station:</strong> ${next.station_name}</div>`;
-                }
-                content += `</div>`;
-            }
-            content += `<div class="card-text" style="margin-top:5px; font-size: 11px; color:#999;">${data.updated_time || ''}</div>`;
-            content += `</div>`;
-            
-            // Build the detailed timeline
-            data.data.forEach((stn, idx) => {
-                let actualArr = '', schedArr = '', actualDep = '', schedDep = '';
-                
-                if (stn.timing.length === 10) {
-                    actualArr = stn.timing.substring(0, 5);
-                    schedArr = stn.timing.substring(5, 10);
-                } else if (stn.timing.length === 5) {
-                    actualArr = stn.timing;
-                    schedArr = stn.timing;
-                }
-                
-                // Calculate departure if halt is known
-                if (actualArr && stn.halt) {
-                    const haltMatch = stn.halt.match(/(\d+)/);
-                    if (haltMatch) {
-                        const haltMins = parseInt(haltMatch[1]);
-                        const [h, m] = actualArr.split(':').map(Number);
-                        const depTotal = h * 60 + m + haltMins;
-                        actualDep = `${String(Math.floor(depTotal / 60) % 24).padStart(2, '0')}:${String(depTotal % 60).padStart(2, '0')}`;
-                        
-                        const [sh, sm] = schedArr.split(':').map(Number);
-                        const sdepTotal = sh * 60 + sm + haltMins;
-                        schedDep = `${String(Math.floor(sdepTotal / 60) % 24).padStart(2, '0')}:${String(sdepTotal % 60).padStart(2, '0')}`;
-                    } else {
-                        actualDep = actualArr;
-                        schedDep = schedArr;
-                    }
-                }
+        const $ = cheerio.load(response.data);
+        const statusMsg = $('.status-box, .alert, .badge').text().trim();
+        
+        if (!statusMsg) {
+             return res.send(wrapHTML('Result', '<div class="error">Train not found or data unavailable.</div>'));
+        }
 
-                const isCurrent = idx === currentStnIdx;
-                content += `<div class="card ${isCurrent ? 'tl-current' : ''}" style="${idx < currentStnIdx ? 'opacity:0.6;' : ''}">
-                    <div class="card-title">${stn.station_name} <span style="font-size:11px;color:#888;">(PF ${stn.platform || '-'})</span></div>
+        // Build the top banner with exact status
+        let content = `<div class="card" style="border-left: 4px solid #0b3e71;">
+            <div class="card-title">Live Status</div>
+            <div class="card-text success" style="font-weight:bold; font-size: 15px;">${statusMsg}</div>
+        </div>`;
+        
+        let foundAny = false;
+
+        // Build the detailed timeline
+        $('tbody.ampstart-caption tr').each((i, el) => {
+            const tds = $(el).find('td');
+            if (tds.length >= 7) {
+                foundAny = true;
+                const stnName = $(tds[1]).text().trim();
+                const schArr = $(tds[2]).text().trim();
+                const schDep = $(tds[3]).text().trim();
+                
+                const actArr = $(tds[4]).contents().first().text().trim();
+                const delayArr = $(tds[4]).find('span.red, span.green').first().text().trim();
+                
+                const actDep = $(tds[5]).contents().first().text().trim();
+                const delayDep = $(tds[5]).find('span.red, span.green').first().text().trim();
+                
+                const dist = $(tds[6]).contents().first().text().trim();
+
+                const isCurrent = statusMsg.toUpperCase().includes(stnName.toUpperCase());
+
+                content += `<div class="card ${isCurrent ? 'tl-current' : ''}">
+                    <div class="card-title">${stnName}</div>
                     <div class="tl-times" style="flex-direction:column; gap:3px;">
-                        <span style="font-weight:bold; color:#0b3e71;">ETA (Arr): ${actualArr || '-'} <span style="font-weight:normal; color:#888; font-size:10px;">(Sch: ${schedArr || '-'})</span></span>
-                        ${actualDep ? `<span style="font-weight:bold; color:#5da03b;">ETD (Dep): ${actualDep} <span style="font-weight:normal; color:#888; font-size:10px;">(Sch: ${schedDep})</span></span>` : ''}
-                        <span>Dist: ${stn.distance} | Halt: ${stn.halt}</span>
+                        <span style="font-weight:bold; color:#0b3e71;">ETA (Arr): ${actArr} ${delayArr} <span style="font-weight:normal; color:#888; font-size:10px;">(Sch: ${schArr})</span></span>
+                        <span style="font-weight:bold; color:#5da03b;">ETD (Dep): ${actDep} ${delayDep} <span style="font-weight:normal; color:#888; font-size:10px;">(Sch: ${schDep})</span></span>
+                        <span>Dist: ${dist} km</span>
                     </div>
                 </div>`;
-            });
-            res.send(wrapHTML(data.train_name || trainNo, content));
-        } else {
-            res.send(wrapHTML('Result', '<div class="error">Train not found or data unavailable.</div>'));
+            }
+        });
+
+        if (!foundAny) {
+            content += '<div class="error">Timeline data unavailable.</div>';
         }
+        res.send(wrapHTML(trainNo, content));
     } catch (e) {
         res.send(wrapHTML('Error', `<div class="error">Backend Error: ${e.message}</div>`));
     }
