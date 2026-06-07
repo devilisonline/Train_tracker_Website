@@ -1,0 +1,8 @@
+MIDlet-1: Train Tracker,,TrainTracker
+MIDlet-Name: Train Tracker
+MIDlet-Vendor: Antigravity
+MIDlet-Version: 1.0
+MIDlet-Jar-URL: TrainTracker.jar
+MIDlet-Jar-Size: 310877
+MicroEdition-Configuration: CLDC-1.1
+MicroEdition-Profile: MIDP-2.0

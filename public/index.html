@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train Tracker Premium</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <i class="fa-solid fa-train-subway"></i> TrainTracker
+            </div>
+            <ul class="nav-links">
+                <li class="active" onclick="switchTab('spot-train', this)">
+                    <i class="fa-solid fa-magnifying-glass"></i> Spot Your Train
+                </li>
+                <li onclick="switchTab('live-station', this)">
+                    <i class="fa-solid fa-bell"></i> Live Station
+                </li>
+                <li onclick="switchTab('train-schedule', this)">
+                    <i class="fa-regular fa-calendar-days"></i> Train Schedule
+                </li>
+                <li onclick="switchTab('trains-between', this)">
+                    <i class="fa-solid fa-arrow-right-arrow-left"></i> Trains B/w Stations
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="content-area">
+            
+            <!-- Spot Your Train -->
+            <section id="spot-train" class="tab-content active">
+                <div class="tab-header">
+                    <h2>Spot Your Train</h2>
+                </div>
+                <div class="tab-body">
+                    <div class="toggle-group">
+                        <button class="toggle-btn active">Train Instances</button>
+                        <button class="toggle-btn">Journey Station Basis</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Train No./Name</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="live-train-no" placeholder="Train No./Name">
+                            <i class="fa-solid fa-xmark clear-icon" onclick="clearInput('live-train-no')"></i>
+                            <i class="fa-solid fa-magnifying-glass search-icon" onclick="fetchLiveStatus()"></i>
+                        </div>
+                    </div>
+                    <div id="live-result" class="result-container"></div>
+                </div>
+            </section>
+
+            <!-- Live Station -->
+            <section id="live-station" class="tab-content">
+                <div class="tab-header">
+                    <h2>Live Station</h2>
+                </div>
+                <div class="tab-body">
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label>Station <span class="required">*</span></label>
+                            <div class="input-wrapper">
+                                <input type="text" id="station-code" placeholder="Station (e.g. NDLS)">
+                                <i class="fa-solid fa-xmark clear-icon" onclick="clearInput('station-code')"></i>
+                            </div>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label>To Station <span class="required">*</span></label>
+                            <div class="input-wrapper">
+                                <input type="text" id="station-to" placeholder="To Station (optional)">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="action-buttons mt-4" style="justify-content: flex-start;">
+                        <button class="btn-primary" onclick="fetchLiveStation()">Get Trains</button>
+                        <button class="btn-secondary" onclick="clearStationForm()">Clear</button>
+                    </div>
+                    <div id="station-result" class="result-container"></div>
+                </div>
+            </section>
+
+            <!-- Train Schedule -->
+            <section id="train-schedule" class="tab-content">
+                <div class="tab-header">
+                    <h2>Train Schedule</h2>
+                </div>
+                <div class="tab-body">
+                    <div class="form-group">
+                        <label>Train No./Name</label>
+                        <div class="input-wrapper with-button">
+                            <input type="text" id="schedule-train-no" placeholder="Train No./Name">
+                            <i class="fa-solid fa-xmark clear-icon" onclick="clearInput('schedule-train-no')"></i>
+                            <i class="fa-solid fa-magnifying-glass search-icon" style="right: 140px;"></i>
+                            <button class="btn-inline" onclick="fetchSchedule()">Get Schedule</button>
+                        </div>
+                    </div>
+                    <div id="schedule-result" class="result-container"></div>
+                </div>
+            </section>
+
+            <!-- Trains B/w Stations -->
+            <section id="trains-between" class="tab-content">
+                <div class="tab-header">
+                    <h2>Trains B/w Stations</h2>
+                </div>
+                <div class="tab-body">
+                    <div class="form-row align-center">
+                        <div class="form-group flex-1">
+                            <label>From Station <span class="required">*</span></label>
+                            <div class="input-wrapper">
+                                <input type="text" id="between-src" placeholder="From Station">
+                                <i class="fa-solid fa-xmark clear-icon" onclick="clearInput('between-src')"></i>
+                            </div>
+                        </div>
+                        <div class="swap-icon" onclick="swapStations()">
+                            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label>To Station <span class="required">*</span></label>
+                            <div class="input-wrapper">
+                                <input type="text" id="between-dest" placeholder="To Station">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="action-buttons mt-4">
+                        <button class="btn-primary" onclick="fetchBetweenTrains()">Get Trains</button>
+                        <button class="btn-secondary" onclick="clearBetweenForm()">Clear</button>
+                    </div>
+                    <div id="between-result" class="result-container"></div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
