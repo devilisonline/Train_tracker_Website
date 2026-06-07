@@ -37,67 +37,88 @@ app.get('/spot-result', async (req, res) => {
     if (!trainNo) return res.send(wrapHTML('Error', '<div class="error">Missing Train No</div>'));
 
     try {
-        const { data } = await axios.get(`https://www.confirmtkt.com/train-running-status/${trainNo}`, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Cache-Control': 'no-cache'
-            },
-            timeout: 8000
+        const response = await axios.get(`https://rappid.in/apis/train.php?train_no=${trainNo}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            timeout: 5000
         });
         
-        const $ = cheerio.load(data);
-        const scriptData = $('script').filter((i, el) => $(el).html().includes('var data =')).html();
-        
-        if (scriptData) {
-            const match = scriptData.match(/var data = (.*?);/);
-            if (match) {
-                const trn = JSON.parse(match[1]);
-                let content = `<div class="card" style="border-left: 4px solid #0b3e71;">
-                    <div class="card-title">Live Status (0 Delay)</div>
-                    <div class="card-text success" style="font-weight:bold; font-size: 15px;">${trn.StatusAsOf || 'Running'}</div>
-                    ${trn.CurrentStation?.StationName ? `<div class="card-text" style="color: #d04646; font-weight:bold; margin-top:5px;">📍 At ${trn.CurrentStation.StationName}</div>` : ''}
-                    ${trn.DelayInArrival ? `<div class="card-text" style="margin-top:2px;">Delay: ${trn.DelayInArrival}</div>` : ''}
-                </div>`;
+        if (response.data && response.data.success) {
+            const data = response.data;
+            let currentStnIdx = data.data.findIndex(s => s.is_current_station);
+            
+            // Build the top banner with exact status
+            let content = `<div class="card" style="border-left: 4px solid #0b3e71;">
+                <div class="card-title">Live Status</div>
+                <div class="card-text success" style="font-weight:bold; font-size: 15px;">${data.message || 'Running'}</div>`;
+            
+            if (currentStnIdx !== -1) {
+                const current = data.data[currentStnIdx];
+                const prev = currentStnIdx > 0 ? data.data[currentStnIdx - 1] : null;
+                const next = currentStnIdx < data.data.length - 1 ? data.data[currentStnIdx + 1] : null;
                 
-                trn.Schedule.forEach(stn => {
-                    const isCurrent = stn.StationCode === trn.CurrentStation?.StationCode;
-                    content += `<div class="card ${isCurrent ? 'tl-current' : ''}">
-                        <div class="card-title">${stn.StationName} <span style="font-size:11px;color:#888;">(${stn.StationCode})</span></div>
-                        <div class="tl-times">
-                            <span>Arr: ${stn.ArrivalTime} | Dep: ${stn.DepartureTime}</span>
-                            <span>Dist: ${stn.Distance} km</span>
-                        </div>
-                    </div>`;
-                });
-                return res.send(wrapHTML(`${trn.TrainNo} - ${trn.TrainName}`, content));
+                content += `<div style="margin-top: 10px; padding-top: 5px; border-top: 1px dashed #ccc;">`;
+                if (current.delay && current.delay !== '0min') {
+                    content += `<div class="card-text error" style="padding:0; text-align:left; font-size:14px;">Delay: ${current.delay}</div>`;
+                }
+                
+                if (data.message.toLowerCase().includes('departed') || data.message.toLowerCase().includes('crossed')) {
+                    if (current) content += `<div class="card-text" style="color: #666;"><strong>Last Station:</strong> ${current.station_name}</div>`;
+                    if (next) content += `<div class="card-text" style="color: #0b3e71; font-weight:bold;"><strong>Heading to:</strong> ${next.station_name}</div>`;
+                } else {
+                    if (current) content += `<div class="card-text" style="color: #0b3e71; font-weight:bold;"><strong>Currently At:</strong> ${current.station_name}</div>`;
+                    if (next) content += `<div class="card-text" style="color: #666;"><strong>Next Station:</strong> ${next.station_name}</div>`;
+                }
+                content += `</div>`;
             }
-        }
-        
-        // If we reach here, we got blocked or structure changed
-        const refreshHtml = `
-            <div class="error" style="background:#ffecec; border:1px solid #d04646; border-radius:5px; margin-bottom:15px;">
-                Connection Blocked by Server.
-            </div>
-            <p style="text-align:center; margin-bottom:15px; font-size:13px;">To get 0-minute live data, we bypass the server limits. Please try again to connect.</p>
-            <form action="/spot-result" method="GET">
-                <input type="hidden" name="trainNo" value="${trainNo}">
-                <button type="submit" class="btn-primary" style="background-color: #d04646;">Refresh Connection</button>
-            </form>
-        `;
-        res.send(wrapHTML('Connection Blocked', refreshHtml));
+            content += `<div class="card-text" style="margin-top:5px; font-size: 11px; color:#999;">${data.updated_time || ''}</div>`;
+            content += `</div>`;
+            
+            // Build the detailed timeline
+            data.data.forEach((stn, idx) => {
+                let actualArr = '', schedArr = '', actualDep = '', schedDep = '';
+                
+                if (stn.timing.length === 10) {
+                    actualArr = stn.timing.substring(0, 5);
+                    schedArr = stn.timing.substring(5, 10);
+                } else if (stn.timing.length === 5) {
+                    actualArr = stn.timing;
+                    schedArr = stn.timing;
+                }
+                
+                // Calculate departure if halt is known
+                if (actualArr && stn.halt) {
+                    const haltMatch = stn.halt.match(/(\d+)/);
+                    if (haltMatch) {
+                        const haltMins = parseInt(haltMatch[1]);
+                        const [h, m] = actualArr.split(':').map(Number);
+                        const depTotal = h * 60 + m + haltMins;
+                        actualDep = `${String(Math.floor(depTotal / 60) % 24).padStart(2, '0')}:${String(depTotal % 60).padStart(2, '0')}`;
+                        
+                        const [sh, sm] = schedArr.split(':').map(Number);
+                        const sdepTotal = sh * 60 + sm + haltMins;
+                        schedDep = `${String(Math.floor(sdepTotal / 60) % 24).padStart(2, '0')}:${String(sdepTotal % 60).padStart(2, '0')}`;
+                    } else {
+                        actualDep = actualArr;
+                        schedDep = schedArr;
+                    }
+                }
 
+                const isCurrent = idx === currentStnIdx;
+                content += `<div class="card ${isCurrent ? 'tl-current' : ''}" style="${idx < currentStnIdx ? 'opacity:0.6;' : ''}">
+                    <div class="card-title">${stn.station_name} <span style="font-size:11px;color:#888;">(PF ${stn.platform || '-'})</span></div>
+                    <div class="tl-times" style="flex-direction:column; gap:3px;">
+                        <span style="font-weight:bold; color:#0b3e71;">ETA (Arr): ${actualArr || '-'} <span style="font-weight:normal; color:#888; font-size:10px;">(Sch: ${schedArr || '-'})</span></span>
+                        ${actualDep ? `<span style="font-weight:bold; color:#5da03b;">ETD (Dep): ${actualDep} <span style="font-weight:normal; color:#888; font-size:10px;">(Sch: ${schedDep})</span></span>` : ''}
+                        <span>Dist: ${stn.distance} | Halt: ${stn.halt}</span>
+                    </div>
+                </div>`;
+            });
+            res.send(wrapHTML(data.train_name || trainNo, content));
+        } else {
+            res.send(wrapHTML('Result', '<div class="error">Train not found or data unavailable.</div>'));
+        }
     } catch (e) {
-        const refreshHtml = `
-            <div class="error" style="background:#ffecec; border:1px solid #d04646; border-radius:5px; margin-bottom:15px;">
-                Request Timeout (${e.message})
-            </div>
-            <form action="/spot-result" method="GET">
-                <input type="hidden" name="trainNo" value="${trainNo}">
-                <button type="submit" class="btn-primary" style="background-color: #d04646;">Try Again</button>
-            </form>
-        `;
-        res.send(wrapHTML('Timeout Error', refreshHtml));
+        res.send(wrapHTML('Error', `<div class="error">Backend Error: ${e.message}</div>`));
     }
 });
 
