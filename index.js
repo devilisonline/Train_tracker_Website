@@ -187,22 +187,51 @@ app.get('/schedule-result', async (req, res) => {
         const $ = cheerio.load(data);
         let content = '';
 
-        $('.trainlist tr').each((i, el) => {
-            const tds = $(el).find('td');
-            if (tds.length >= 7) {
-                const stnCode = $(tds[1]).text().trim();
-                const arr = $(tds[3]).text().trim();
-                const dep = $(tds[4]).text().trim();
-                const dist = $(tds[6]).text().trim();
-                content += `<div class="card">
-                    <div class="card-title">${stnCode}</div>
-                    <div class="tl-times">
-                        <span>Arr: ${arr} | Dep: ${dep}</span>
-                        <span>Dist: ${dist} km</span>
-                    </div>
-                </div>`;
-            }
-        });
+        const scheduleTable = $('table').filter((i, el) => $(el).text().includes('Station Name') && $(el).text().includes('Distance')).first();
+        if (scheduleTable.length > 0) {
+            scheduleTable.find('tr').each((i, el) => {
+                const tds = $(el).find('td');
+                if (tds.length >= 4) {
+                    // It can be 5 columns or more.
+                    // The first column usually contains the S.No and Code, like "1PRYJ"
+                    const col0 = $(tds[0]).text().trim();
+                    const codeMatch = col0.match(/[A-Z]+/);
+                    if (!codeMatch) return; // Skip headers
+                    const stnCode = codeMatch[0];
+
+                    // The station name and distance are usually in index 2 (or the one containing 'kms')
+                    let dist = '-';
+                    let col2 = $(tds[2]).text().trim();
+                    const distMatch = col2.match(/(\d+)\s*kms/);
+                    if (distMatch) dist = distMatch[1];
+
+                    // The timings are usually in the last column
+                    let arr = '-', dep = '-';
+                    const timingText = $(tds[tds.length - 1]).text().trim();
+                    const timeMatches = timingText.match(/(\d{2}:\d{2})/g);
+                    if (timeMatches && timeMatches.length >= 2) {
+                        arr = timeMatches[0];
+                        dep = timeMatches[1];
+                    } else if (timeMatches && timeMatches.length === 1) {
+                        if (timingText.toLowerCase().includes('source')) {
+                            arr = 'Source';
+                            dep = timeMatches[0];
+                        } else {
+                            arr = timeMatches[0];
+                            dep = 'Dest';
+                        }
+                    }
+
+                    content += `<div class="card">
+                        <div class="card-title">${stnCode}</div>
+                        <div class="tl-times">
+                            <span>Arr: ${arr} | Dep: ${dep}</span>
+                            <span>Dist: ${dist} km</span>
+                        </div>
+                    </div>`;
+                }
+            });
+        }
 
         if (!content) content = '<div class="error">Schedule not found.</div>';
         res.send(wrapHTML(`Schedule: ${trainNo}`, content));
