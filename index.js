@@ -151,17 +151,19 @@ app.get('/between-result', async (req, res) => {
         const $ = cheerio.load(data);
         let content = '';
 
-        $('.trainlist > tbody > tr').each((i, el) => {
+        $('.trainlist tr').each((i, el) => {
             const tds = $(el).find('td');
-            if (tds.length >= 8) {
+            if (tds.length >= 7) {
                 const trnNum = $(tds[0]).text().trim();
                 const trnName = $(tds[1]).text().trim();
-                const dep = $(tds[4]).text().trim();
+                const fromStn = $(tds[2]).text().trim();
+                const dep = $(tds[3]).text().trim();
+                const toStn = $(tds[4]).text().trim();
                 const arr = $(tds[5]).text().trim();
                 const travelTime = $(tds[6]).text().trim();
                 content += `<div class="card">
                     <div class="card-title">${trnNum} - ${trnName}</div>
-                    <div class="card-text">Dep: ${dep} | Arr: ${arr}</div>
+                    <div class="card-text">Dep: ${dep} (${fromStn}) | Arr: ${arr} (${toStn})</div>
                     <div class="card-text">Travel Time: ${travelTime}</div>
                 </div>`;
             }
@@ -185,7 +187,7 @@ app.get('/schedule-result', async (req, res) => {
         const $ = cheerio.load(data);
         let content = '';
 
-        $('.trainlist > tbody > tr').each((i, el) => {
+        $('.trainlist tr').each((i, el) => {
             const tds = $(el).find('td');
             if (tds.length >= 7) {
                 const stnCode = $(tds[1]).text().trim();
