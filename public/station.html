@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Station</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="header">
+        <a href="/" class="back-btn">&larr; Back</a>
+        <h2>Live Station</h2>
+    </div>
+    <div class="form-container">
+        <form action="/station-result" method="GET">
+            <div class="form-group">
+                <label for="stn">Station Code (e.g., NDLS)</label>
+                <input type="text" id="stn" name="stn" placeholder="Station Code" required>
+            </div>
+            <button type="submit" class="btn-primary">Get Trains</button>
+        </form>
+    </div>
+</body>
+</html>

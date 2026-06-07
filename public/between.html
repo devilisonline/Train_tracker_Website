@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trains B/w Stations</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="header">
+        <a href="/" class="back-btn">&larr; Back</a>
+        <h2>Trains B/w Stations</h2>
+    </div>
+    <div class="form-container">
+        <form action="/between-result" method="GET">
+            <div class="form-group">
+                <label for="from">From Station Code</label>
+                <input type="text" id="from" name="from" placeholder="From Station" required>
+            </div>
+            <div class="form-group">
+                <label for="to">To Station Code</label>
+                <input type="text" id="to" name="to" placeholder="To Station" required>
+            </div>
+            <button type="submit" class="btn-primary">Get Trains</button>
+        </form>
+    </div>
+</body>
+</html>
