@@ -17,7 +17,15 @@
                 <label for="trainNo">Train No./Name</label>
                 <input type="text" id="trainNo" name="trainNo" placeholder="Enter Train Number" required>
             </div>
-            <button type="submit" class="btn-primary">Get Status</button>
+            <div class="form-group" style="margin-top: 10px;">
+                <label for="day">Journey Date</label>
+                <select id="day" name="day" style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                    <option value="yesterday">Yesterday</option>
+                    <option value="today" selected>Today</option>
+                    <option value="tomorrow">Tomorrow</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-primary" style="margin-top: 15px;">Get Status</button>
         </form>
     </div>
 </body>

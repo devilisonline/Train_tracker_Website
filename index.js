@@ -34,10 +34,11 @@ function wrapHTML(title, content) {
 // 1. Spot Result
 app.get('/spot-result', async (req, res) => {
     const trainNo = req.query.trainNo;
+    const day = req.query.day || 'today';
     if (!trainNo) return res.send(wrapHTML('Error', '<div class="error">Missing Train No</div>'));
 
     try {
-        const response = await axios.get(`https://rappid.in/apis/train.php?train_no=${trainNo}`, {
+        const response = await axios.get(`https://rappid.in/apis/train.php?train_no=${trainNo}&start_date=${day}&day=${day}`, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
             timeout: 5000
         });
