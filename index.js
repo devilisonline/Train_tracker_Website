@@ -37,29 +37,67 @@ app.get('/spot-result', async (req, res) => {
     if (!trainNo) return res.send(wrapHTML('Error', '<div class="error">Missing Train No</div>'));
 
     try {
-        const response = await axios.get(`https://rappid.in/apis/train.php?train_no=${trainNo}`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            timeout: 5000
+        const { data } = await axios.get(`https://www.confirmtkt.com/train-running-status/${trainNo}`, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Cache-Control': 'no-cache'
+            },
+            timeout: 8000
         });
         
-        if (response.data && response.data.success) {
-            let content = `<div class="card"><div class="card-title">Live Status</div><div class="card-text success" style="font-weight:bold;">${response.data.message || 'Running'}</div><div class="card-text">Updated: ${response.data.updated_time || 'Just now'}</div></div>`;
-            
-            response.data.data.forEach(stn => {
-                content += `<div class="card ${stn.is_current_station ? 'tl-current' : ''}">
-                    <div class="card-title">${stn.station_name} <span style="font-size:11px;color:#888;">(PF ${stn.platform})</span></div>
-                    <div class="tl-times">
-                        <span>Arr/Dep: ${stn.timing}</span>
-                        <span>Dist: ${stn.distance}</span>
-                    </div>
+        const $ = cheerio.load(data);
+        const scriptData = $('script').filter((i, el) => $(el).html().includes('var data =')).html();
+        
+        if (scriptData) {
+            const match = scriptData.match(/var data = (.*?);/);
+            if (match) {
+                const trn = JSON.parse(match[1]);
+                let content = `<div class="card" style="border-left: 4px solid #0b3e71;">
+                    <div class="card-title">Live Status (0 Delay)</div>
+                    <div class="card-text success" style="font-weight:bold; font-size: 15px;">${trn.StatusAsOf || 'Running'}</div>
+                    ${trn.CurrentStation?.StationName ? `<div class="card-text" style="color: #d04646; font-weight:bold; margin-top:5px;">📍 At ${trn.CurrentStation.StationName}</div>` : ''}
+                    ${trn.DelayInArrival ? `<div class="card-text" style="margin-top:2px;">Delay: ${trn.DelayInArrival}</div>` : ''}
                 </div>`;
-            });
-            res.send(wrapHTML(response.data.train_name || trainNo, content));
-        } else {
-            res.send(wrapHTML('Result', '<div class="error">Train not found or data unavailable.</div>'));
+                
+                trn.Schedule.forEach(stn => {
+                    const isCurrent = stn.StationCode === trn.CurrentStation?.StationCode;
+                    content += `<div class="card ${isCurrent ? 'tl-current' : ''}">
+                        <div class="card-title">${stn.StationName} <span style="font-size:11px;color:#888;">(${stn.StationCode})</span></div>
+                        <div class="tl-times">
+                            <span>Arr: ${stn.ArrivalTime} | Dep: ${stn.DepartureTime}</span>
+                            <span>Dist: ${stn.Distance} km</span>
+                        </div>
+                    </div>`;
+                });
+                return res.send(wrapHTML(`${trn.TrainNo} - ${trn.TrainName}`, content));
+            }
         }
+        
+        // If we reach here, we got blocked or structure changed
+        const refreshHtml = `
+            <div class="error" style="background:#ffecec; border:1px solid #d04646; border-radius:5px; margin-bottom:15px;">
+                Connection Blocked by Server.
+            </div>
+            <p style="text-align:center; margin-bottom:15px; font-size:13px;">To get 0-minute live data, we bypass the server limits. Please try again to connect.</p>
+            <form action="/spot-result" method="GET">
+                <input type="hidden" name="trainNo" value="${trainNo}">
+                <button type="submit" class="btn-primary" style="background-color: #d04646;">Refresh Connection</button>
+            </form>
+        `;
+        res.send(wrapHTML('Connection Blocked', refreshHtml));
+
     } catch (e) {
-        res.send(wrapHTML('Error', `<div class="error">Backend Error: ${e.message}</div>`));
+        const refreshHtml = `
+            <div class="error" style="background:#ffecec; border:1px solid #d04646; border-radius:5px; margin-bottom:15px;">
+                Request Timeout (${e.message})
+            </div>
+            <form action="/spot-result" method="GET">
+                <input type="hidden" name="trainNo" value="${trainNo}">
+                <button type="submit" class="btn-primary" style="background-color: #d04646;">Try Again</button>
+            </form>
+        `;
+        res.send(wrapHTML('Timeout Error', refreshHtml));
     }
 });
 
